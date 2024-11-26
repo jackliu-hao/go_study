@@ -2,12 +2,15 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"jikeshijian_go/webbook/internal/domain"
 	"jikeshijian_go/webbook/internal/service"
 	"net/http"
+	"time"
 )
 
 const (
@@ -40,10 +43,14 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/signup", h.SignUp)
 	// POST /users/login
 	ug.POST("/login", h.Login)
+
+	ug.POST("/loginjwt", h.LoginJWT)
 	// POST /users/edit
 	ug.POST("/edit", h.Edit)
 	// GET /users/profile
 	ug.GET("/profile", h.Profile)
+	// ProfileJWT
+	ug.GET("/profileJWT", h.Profile)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -96,6 +103,55 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 	}
 
 	ctx.String(http.StatusOK, "注册成功")
+}
+
+func (h *UserHandler) LoginJWT(ctx *gin.Context) {
+	type Req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var loginReq Req
+	if err := ctx.Bind(&loginReq); err != nil {
+		return
+	}
+	user, err := h.svc.Login(ctx, domain.User{
+		Email:    loginReq.Email,
+		Password: loginReq.Password,
+	})
+	if err != nil {
+		if err == service.ErrInvalidUserOrPassword {
+			ctx.String(http.StatusOK, "账号或密码错误")
+			return
+		}
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	// 使用jwt设置登录状态
+	// 使用jwt生成一个token
+
+	claims := UserClaims{
+		// 设置过期时间
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Minute)),
+		},
+		// 设置用户id
+		Uid: user.Id,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedString, err := token.SignedString([]byte("0776f450dd575004ba7c69930c579cae"))
+	if err != nil {
+		ctx.String(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	// 把jwt放到header中
+	ctx.Header("x-jwt-token", signedString)
+	fmt.Println(signedString)
+
+	// 登录成功
+	ctx.String(http.StatusOK, "登录成功")
+	return
+
 }
 
 func (h *UserHandler) Login(ctx *gin.Context) {
@@ -188,4 +244,42 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, string(userJson))
 
+}
+
+func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
+	value, exists := ctx.Get("claims")
+	if !exists {
+		// 监控住这个错误
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	claims, ok := value.(*UserClaims)
+	if !ok {
+		// 系统错误
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	user, err := h.svc.Profile(ctx, claims.Uid)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	// 把user转成json
+	userJson, err := json.Marshal(user)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	ctx.JSON(http.StatusOK, string(userJson))
+
+}
+
+// UserClaims 存放jwt的内容
+type UserClaims struct {
+	jwt.RegisteredClaims
+	// 声名自己要放到Claim的数据
+	Uid int64
 }

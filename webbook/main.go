@@ -55,9 +55,9 @@ func InitWebServer() *gin.Engine {
 	server.Use(cors.New(cors.Config{
 		//AllowAllOrigins: true,
 		//AllowOrigins:     []string{"http://localhost:3000"},
-		AllowCredentials: true, // 携带cookie
-
-		AllowHeaders: []string{"Content-Type"},
+		AllowCredentials: true,                    // 携带cookie
+		ExposeHeaders:    []string{"x-jwt-token"}, // 加上这个后，前端才能拿到结果
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
 		//AllowHeaders: []string{"content-type"},
 		//AllowMethods: []string{"POST"},
 		AllowOriginFunc: func(origin string) bool {
@@ -84,9 +84,14 @@ func InitWebServer() *gin.Engine {
 	}
 	server.Use(sessions.Sessions("mysession", store))
 	// 注册登录的middleware
-	server.Use(middleware.NewLoginMiddlewareBuilder().
+	//server.Use(middleware.NewLoginMiddlewareBuilder().
+	//	IgnorePath("/users/signup").
+	//	IgnorePath("/users/login").
+	//	Build())
+	// 注册jwt的middleware
+	server.Use(middleware.NewLoginJwtMiddlewareBuilder().
 		IgnorePath("/users/signup").
-		IgnorePath("/users/login").
+		IgnorePath("/users/loginjwt").
 		Build())
 	return server
 }
