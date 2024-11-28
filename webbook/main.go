@@ -3,8 +3,9 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/redis"
+	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"jikeshijian_go/webbook/internal/repository"
@@ -12,6 +13,7 @@ import (
 	"jikeshijian_go/webbook/internal/service"
 	"jikeshijian_go/webbook/internal/web"
 	"jikeshijian_go/webbook/internal/web/middleware"
+	"jikeshijian_go/webbook/pkg/ginx/middlewares/ratelimit"
 	"strings"
 	"time"
 )
@@ -73,15 +75,15 @@ func InitWebServer() *gin.Engine {
 	// 基于cookie的store
 	//store := cookie.NewStore([]byte("secret_key_1234567890"))
 	// 基于内存实现的store
-	//store := memstore.NewStore([]byte("0776f450dd575004ba7c69930c579cae"),
-	//	[]byte("0776f450dd575004ba7c69930c579cae"))
-	// 基于redis实现的store
-	store, err := redis.NewStore(16, "tcp", "localhost:6379", "",
-		[]byte("0776f450dd575004ba7c69930c579cae"),
+	store := memstore.NewStore([]byte("0776f450dd575004ba7c69930c579cae"),
 		[]byte("0776f450dd575004ba7c69930c579cae"))
-	if err != nil {
-		panic(err)
-	}
+	// 基于redis实现的store
+	//store, err := redis.NewStore(16, "tcp", "localhost:6379", "",
+	//	[]byte("0776f450dd575004ba7c69930c579cae"),
+	//	[]byte("0776f450dd575004ba7c69930c579cae"))
+	//if err != nil {
+	//	panic(err)
+	//}
 	server.Use(sessions.Sessions("mysession", store))
 	// 注册登录的middleware
 	//server.Use(middleware.NewLoginMiddlewareBuilder().
@@ -93,6 +95,13 @@ func InitWebServer() *gin.Engine {
 		IgnorePath("/users/signup").
 		IgnorePath("/users/loginjwt").
 		Build())
+	// 使用限流的工具
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+	})
+
+	server.Use(ratelimit.NewBuilder(client, time.Minute, 5).Build())
 	return server
 }
 

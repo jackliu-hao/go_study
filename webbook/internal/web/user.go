@@ -50,7 +50,7 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	// GET /users/profile
 	ug.GET("/profile", h.Profile)
 	// ProfileJWT
-	ug.GET("/profileJWT", h.Profile)
+	ug.GET("/profileJWT", h.ProfileJWT)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
