@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	"jikeshijian_go/webbook/internal/domain"
+	"jikeshijian_go/webbook/internal/repository/cache"
 	"jikeshijian_go/webbook/internal/repository/dao"
 )
 
@@ -13,7 +14,8 @@ var (
 )
 
 type UserRepository struct {
-	dao *dao.UserDAO
+	dao   *dao.UserDAO
+	cache cache.UserCache
 }
 
 // Create 创建
@@ -31,22 +33,41 @@ func (r *UserRepository) Create(ctx context.Context, user domain.User) error {
 
 }
 
-func NewUserRepository(dao *dao.UserDAO) UserRepository {
+func NewUserRepository(dao *dao.UserDAO, userCache cache.UserCache) UserRepository {
 
 	return UserRepository{
-		dao: dao,
+		dao:   dao,
+		cache: userCache,
 	}
 }
 
 func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
 
 	// 先从cache中查找
-
-	// 再从dao中查找
-	user, err := r.dao.FindById(ctx, id)
-	return user, err
-
-	// 找到了在写到cache
+	u, err := r.cache.Get(ctx, id)
+	if err == nil {
+		// 数据存在
+		return u, nil
+	}
+	// 数据不存在
+	if err == cache.ErrKeyNotExist {
+		// 从数据库中加载
+		user, err := r.dao.FindById(ctx, id)
+		if err != nil {
+			return domain.User{}, ErrUserNotFound
+		}
+		go func() {
+			// 找到了在写到cache
+			err = r.cache.Set(ctx, user)
+			if err != nil {
+				// how to do ?
+				// 应该打日志，做监控
+			}
+		}()
+		return user, err
+	}
+	// 这里怎么搞？缓存出错了
+	return domain.User{}, err
 
 }
 

@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webook
+# 描述 Deployment 的名称
+spec:
+#  副本数量 3
+  replicas: 3
+  selector:
+    matchLabels:
+      app: webook
+#      描述的是 POD的标签选择器，用于标识和选择属于此 Deployment 的 POD
+  template:
+    metadata:
+      name: webook
+      labels:
+        app: webook
+#        POD的具体信息，包括POD的名称和标签
+    spec:
+      containers:
+        - name: webook
+          image: webook:v0.0.1
+#          定义容器的名称和镜像版本
+          ports:
+            - containerPort: 8081
