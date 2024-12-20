@@ -22,6 +22,10 @@ type RedisUserCache struct {
 	expiration time.Duration
 }
 
+// NewUserCache 构造函数
+// A 用到了B ，B 一定是接口 ==》 面向接口编程
+// A 用到了B ，B 一定是A的字段 ==》 规避包变量，包方法，都非常缺乏扩展性
+// A 用到了B ，A绝不初始化B，而是外面注入 ==》 保持依赖注入（DI和IOC）
 func NewUserCache(cmd redis.Cmdable, expiration time.Duration) UserCache {
 	return &RedisUserCache{
 		cmd:        cmd,

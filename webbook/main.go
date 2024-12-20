@@ -3,15 +3,15 @@ package main
 import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"jikeshijian_go/webbook/internal/repository"
 	"jikeshijian_go/webbook/internal/repository/cache"
 	"jikeshijian_go/webbook/internal/repository/dao"
 	"jikeshijian_go/webbook/internal/service"
+	"jikeshijian_go/webbook/internal/service/sms/testsms"
 	"jikeshijian_go/webbook/internal/web"
-	"jikeshijian_go/webbook/internal/web/middleware"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -19,25 +19,25 @@ import (
 func main() {
 
 	// 初始化db
-	//db := InitDb()
-	//
-	//// 初始化UserHandler
-	//uh := InitUserHandler(db)
-	//
-	//// 初始化gin Engine
-	//server := InitWebServer()
-	//
-	//// 注册路由
-	//uh.RegisterRoutes(server)
+	db := InitDb()
+
+	// 初始化UserHandler
+	uh := InitUserHandler(db)
+
+	// 初始化gin Engine
+	server := InitWebServer()
+
+	// 注册路由
+	uh.RegisterRoutes(server)
 
 	// 用于测试k8s部署
-	server := gin.Default()
-	server.GET("/hello", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "hello gin",
-			"time":    time.Now().Unix(),
-		})
-	})
+	//server := gin.Default()
+	//server.GET("/hello", func(ctx *gin.Context) {
+	//	ctx.JSON(http.StatusOK, gin.H{
+	//		"message": "hello gin",
+	//		"time":    time.Now().Unix(),
+	//	})
+	//})
 	server.Run(":8081")
 
 }
@@ -54,9 +54,20 @@ func InitUserHandler(db *gorm.DB) *web.UserHandler {
 
 	// 初始化service
 	svc := service.NewUserService(repo)
-
+	// 初始化smsSvc
+	// 初始化redis
+	// 创建一个新的Redis客户端
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379", // Redis服务器地址
+		Password: "",               // 密码，如果没有设置密码则为空
+		DB:       0,                // 默认数据库
+	})
+	codeCache := cache.NewCodeCache(rdb)
+	codeRepository := repository.NewCodeRepository(*codeCache)
+	smsService := testsms.NewService("testApp")
+	codeService := service.NewCodeService(codeRepository, smsService, "testApp")
 	// 创建uerHandler
-	uh := web.NewUserHandler(svc)
+	uh := web.NewUserHandler(svc, codeService)
 
 	return uh
 }
@@ -101,10 +112,10 @@ func InitWebServer() *gin.Engine {
 	//	IgnorePath("/users/login").
 	//	Build())
 	// 注册jwt的middleware
-	server.Use(middleware.NewLoginJwtMiddlewareBuilder().
-		IgnorePath("/users/signup").
-		IgnorePath("/users/loginjwt").
-		Build())
+	//server.Use(middleware.NewLoginJwtMiddlewareBuilder().
+	//	IgnorePath("/users/signup").
+	//	IgnorePath("/users/loginjwt").
+	//	Build())
 	// 使用限流的工具
 	//client := redis.NewClient(&redis.Options{
 	//	Addr:     "localhost:6379",

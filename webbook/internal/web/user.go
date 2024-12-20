@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
@@ -17,19 +18,25 @@ const (
 	emailRegexPattern = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 	// 和上面比起来，用 ` 看起来就比较清爽
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	// 手机号
+	phoneRegexPattern = "^1[3-9][0-9]{9}$"
 )
 
 type UserHandler struct {
 	svc            *service.UserService
 	emailRexExp    *regexp.Regexp
 	passwordRexExp *regexp.Regexp
+	phoneRexExp    *regexp.Regexp
+	smsCodeSvc     *service.CodeService
 }
 
-func NewUserHandler(svc *service.UserService) *UserHandler {
+func NewUserHandler(svc *service.UserService, smsSvc *service.CodeService) *UserHandler {
 	return &UserHandler{
 		emailRexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
+		phoneRexExp:    regexp.MustCompile(phoneRegexPattern, regexp.None),
 		svc:            svc,
+		smsCodeSvc:     smsSvc,
 	}
 }
 
@@ -51,6 +58,10 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.GET("/profile", h.Profile)
 	// ProfileJWT
 	ug.GET("/profileJWT", h.ProfileJWT)
+	// 验证码相关路由
+	ug.POST("/login_sms/code/send", h.SendSms)
+	// 校验验证码
+	ug.POST("/login_sms/code/check", h.verifySmsCode)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -274,6 +285,78 @@ func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, string(userJson))
+
+}
+
+func (h *UserHandler) SendSms(context *gin.Context) {
+
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+
+	var req Req
+	err := context.Bind(&req)
+	if err != nil {
+		return
+	}
+	// 校验手机号
+	isPhone, err := h.phoneRexExp.MatchString(req.Phone)
+	if err != nil {
+		context.String(http.StatusOK, "系统错误")
+		return
+	}
+	if !isPhone {
+		context.String(http.StatusOK, "非法手机号")
+		return
+	}
+
+	err = h.smsCodeSvc.Send(context, "login", req.Phone)
+	if err != nil {
+		if errors.Is(err, service.ErrSetCodeTooManyTimes) {
+			context.String(http.StatusOK, "发送次数过多")
+		} else {
+			context.String(http.StatusInternalServerError, "系统错误")
+		}
+		return
+	}
+	context.String(http.StatusOK, "发送成功")
+}
+
+func (h *UserHandler) verifySmsCode(context *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	err := context.Bind(&req)
+	if err != nil {
+		context.String(http.StatusBadRequest, "参数错误")
+		return
+	}
+	matchString, err := h.phoneRexExp.MatchString(req.Phone)
+	if err != nil {
+		context.String(http.StatusInternalServerError, "系统错误")
+		return
+	}
+	if !matchString {
+		context.String(http.StatusOK, "非法手机号")
+		return
+	}
+	// 校验验证码是六位手机号
+	verify, err := h.smsCodeSvc.Verify(context, "login", req.Phone, req.Code)
+	if err != nil {
+		if errors.Is(err, service.ErrCodeVerifyFailed) {
+			context.String(http.StatusOK, "验证码错误")
+		} else if errors.Is(err, service.ErrCodeVerifyTooManyTimes) {
+			context.String(http.StatusOK, "验证次数过多")
+		} else {
+			context.String(http.StatusInternalServerError, "系统错误")
+		}
+		return
+	}
+	if verify {
+		context.String(http.StatusOK, "验证成功")
+	}
 
 }
 
