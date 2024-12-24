@@ -2,16 +2,17 @@ package dao
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
-	"jikeshijian_go/webbook/internal/domain"
 	"time"
 )
 
 var (
-	ErrUserDuplicateEmail = errors.New("邮箱冲突")
-	ErrUserNotFound       = gorm.ErrRecordNotFound
+	ErrUserDuplicate = errors.New("邮箱或手机号冲突")
+	ErrUserNotFound  = gorm.ErrRecordNotFound
 )
 
 type UserDAO struct {
@@ -30,7 +31,7 @@ func (dao *UserDAO) Insert(ctx context.Context, user User) error {
 		const uniqueConflictsErr = 1062
 		if mysqlErr.Number == uniqueConflictsErr {
 			// 邮箱冲突
-			return ErrUserDuplicateEmail
+			return ErrUserDuplicate
 		}
 	}
 
@@ -51,7 +52,7 @@ func (dao *UserDAO) UpdateById(ctx context.Context, user User) error {
 	return err
 }
 
-func (dao *UserDAO) FindById(ctx context.Context, id int64) (domain.User, error) {
+func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	var user User
 	// select * from `user` where id = ? limit 1
 
@@ -59,16 +60,16 @@ func (dao *UserDAO) FindById(ctx context.Context, id int64) (domain.User, error)
 
 	//err := dao.db.WithContext(ctx).Model(User{Id: id}).First(&user).Error
 	// 将int64转成time类型
-	return domain.User{
-		Id:        user.Id,
-		Email:     user.Email,
-		Password:  user.Password,
-		AboutMe:   user.AboutMe,
-		Birthday:  user.Birthday,
-		NickName:  user.NickName,
-		UpdatedAt: time.UnixMilli(user.UpdatedAt),
-		CreatedAt: time.UnixMilli(user.CreatedAt),
-	}, err
+	return user, err
+}
+
+func (dao *UserDAO) FindByPhone(ctx *gin.Context, phone string) (User, error) {
+	var user User
+	// select * from `user` where id = ? limit 1
+
+	err := dao.db.WithContext(ctx).Where("phone = ?", phone).First(&user).Error
+
+	return user, err
 }
 
 func NewUserDAO(db *gorm.DB) *UserDAO {
@@ -80,8 +81,8 @@ func NewUserDAO(db *gorm.DB) *UserDAO {
 // User : entity 、 model 、 po
 // 对应DDD中的entity
 type User struct {
-	Id       int64  `gorm:"primaryKey,autoIncrement"`
-	Email    string `gorm:"unique"`
+	Id       int64          `gorm:"primaryKey,autoIncrement"`
+	Email    sql.NullString `gorm:"unique"`
 	Password string
 	// 昵称
 	NickName string
@@ -89,6 +90,10 @@ type User struct {
 	AboutMe string
 	// 生日
 	Birthday string
+	// 手机号
+	// 唯一索引，允许存在多个空值
+	// 但是不能允许多个 ""
+	Phone sql.NullString `gorm:"unique"`
 
 	// 创建时间，毫秒数
 	CreatedAt int64

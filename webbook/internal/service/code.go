@@ -32,7 +32,7 @@ func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service, tplId s
 
 // Send 发送验证码
 func (svc *CodeService) Send(ctx context.Context,
-	// 区别使用业务场景
+// 区别使用业务场景
 	biz string,
 	phone string) error {
 	// 生成验证码 塞进redis
@@ -55,7 +55,7 @@ func (svc *CodeService) Send(ctx context.Context,
 func (svc *CodeService) generateCode() string {
 	// 0-999999
 	num := rand.Intn(1000000)
-	return fmt.Sprintf("%6d", num)
+	return fmt.Sprintf("%06d", num)
 }
 
 // Verify 验证验证码

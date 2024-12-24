@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	ErrDuplicateEmail        = repository.ErrUserDuplicateEmail
+	ErrUserDuplicate         = repository.ErrUserDuplicate
 	ErrInvalidUserOrPassword = errors.New("账号或密码错误")
+	ErrUserNotFind           = repository.ErrUserNotFound
 )
 
 type UserService struct {
@@ -64,4 +65,27 @@ func (svc *UserService) Profile(ctx *gin.Context, id int64) (domain.User, error)
 		return domain.User{}, err
 	}
 	return user, nil
+}
+
+func (svc *UserService) FindOrCreate(c *gin.Context, phone string) (domain.User, error) {
+
+	// 快路径
+	user, err := svc.userRepository.FindByPhone(c, phone)
+	if errors.Is(err, ErrUserNotFind) {
+		// 需要判断这个用户是否存在，如果不存在需要创建
+		user = domain.User{
+			Phone: phone,
+		}
+		// 慢路径
+		err := svc.userRepository.Create(c, user)
+		if err != nil && !errors.Is(err, ErrUserDuplicate) {
+			return domain.User{}, err
+		}
+		// 再次找一下，并且返回
+		// 可能存在主从延迟的问题
+		return svc.userRepository.FindByPhone(c, phone)
+	} else {
+		// 其他错误
+		return domain.User{}, err
+	}
 }

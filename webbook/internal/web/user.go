@@ -3,7 +3,6 @@ package web
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
@@ -105,7 +104,7 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		Password: req.Password,
 	})
 	if err != nil {
-		if err == service.ErrDuplicateEmail {
+		if errors.Is(err, service.ErrUserDuplicate) {
 			ctx.String(http.StatusOK, "邮箱冲突")
 			return
 		}
@@ -117,6 +116,7 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 }
 
 func (h *UserHandler) LoginJWT(ctx *gin.Context) {
+
 	type Req struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -141,28 +141,36 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	// 使用jwt设置登录状态
 	// 使用jwt生成一个token
 
+	err = h.setJwt(ctx, user.Id)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+
+	// 登录成功
+	ctx.String(http.StatusOK, "登录成功")
+	return
+
+}
+
+func (h *UserHandler) setJwt(ctx *gin.Context, uid int64) error {
 	claims := UserClaims{
 		// 设置过期时间
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
 		},
 		// 设置用户id
-		Uid: user.Id,
+		Uid: uid,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signedString, err := token.SignedString([]byte("0776f450dd575004ba7c69930c579cae"))
 	if err != nil {
 		ctx.String(http.StatusInternalServerError, "系统错误")
-		return
+		return err
 	}
 	// 把jwt放到header中
 	ctx.Header("x-jwt-token", signedString)
-	fmt.Println(signedString)
-
-	// 登录成功
-	ctx.String(http.StatusOK, "登录成功")
-	return
-
+	return nil
 }
 
 func (h *UserHandler) Login(ctx *gin.Context) {
@@ -355,8 +363,21 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 		return
 	}
 	if verify {
+
+		// 存放ID
+		domainUser, err := h.svc.FindOrCreate(context, req.Phone)
+		if err != nil {
+			context.String(http.StatusInternalServerError, "系统错误")
+			return
+		}
+		err = h.setJwt(context, domainUser.Id)
+		if err != nil {
+			context.String(http.StatusInternalServerError, "系统错误")
+			return
+		}
 		context.String(http.StatusOK, "验证成功")
 	}
+	return
 
 }
 

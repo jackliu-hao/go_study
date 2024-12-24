@@ -12,9 +12,9 @@ func workerN(i int) {
 	fmt.Printf("worker %d: works done\n", i)
 }
 
-// spawnGroup 
+// spawnGroup
 // 返回一个channel
-func spawnGroup(f func(i int) , num int , groupSignal <- chan signal) <-chan signal{
+func spawnGroup(f func(i int), num int, groupSignal <-chan signal) <-chan signal {
 	c := make(chan signal)
 	//sync.WaitGroup 是 Go 语言标准库中用于等待一组 Goroutine 完成的同步原语。
 	//通过 Add 方法增加计数器，
@@ -24,15 +24,15 @@ func spawnGroup(f func(i int) , num int , groupSignal <- chan signal) <-chan sig
 
 	for i := 0; i < num; i++ {
 		wg.Add(1)
-		go func (i int)  {
-			<- groupSignal
+		go func(i int) {
+			<-groupSignal
 			fmt.Printf("worker %d: start to work...\n", i)
 			f(i)
 			wg.Done()
 		}(i + 1)
 	}
 
-	go func ()  {
+	go func() {
 		wg.Wait()
 		c <- signal{}
 	}()
