@@ -15,11 +15,19 @@ var (
 	ErrUserNotFound  = gorm.ErrRecordNotFound
 )
 
-type UserDAO struct {
+type UserDao interface {
+	Insert(ctx context.Context, user User) error
+	FindByEmail(ctx context.Context, email string) (User, error)
+	UpdateById(ctx context.Context, user User) error
+	FindById(ctx context.Context, id int64) (User, error)
+	FindByPhone(ctx *gin.Context, phone string) (User, error)
+}
+
+type GormUserDAO struct {
 	db *gorm.DB
 }
 
-func (dao *UserDAO) Insert(ctx context.Context, user User) error {
+func (dao *GormUserDAO) Insert(ctx context.Context, user User) error {
 	// 拿到时间戳的毫秒数
 	now := time.Now().UnixMilli()
 	user.CreatedAt = now
@@ -39,20 +47,20 @@ func (dao *UserDAO) Insert(ctx context.Context, user User) error {
 
 }
 
-func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
+func (dao *GormUserDAO) FindByEmail(ctx context.Context, email string) (User, error) {
 
 	var u User
 	err := dao.db.WithContext(ctx).Where("email = ?", email).First(&u).Error
 	return u, err
 }
 
-func (dao *UserDAO) UpdateById(ctx context.Context, user User) error {
+func (dao *GormUserDAO) UpdateById(ctx context.Context, user User) error {
 
 	err := dao.db.WithContext(ctx).Model(&user).Updates(user).Error
 	return err
 }
 
-func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
+func (dao *GormUserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	var user User
 	// select * from `user` where id = ? limit 1
 
@@ -63,7 +71,7 @@ func (dao *UserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	return user, err
 }
 
-func (dao *UserDAO) FindByPhone(ctx *gin.Context, phone string) (User, error) {
+func (dao *GormUserDAO) FindByPhone(ctx *gin.Context, phone string) (User, error) {
 	var user User
 	// select * from `user` where id = ? limit 1
 
@@ -72,8 +80,8 @@ func (dao *UserDAO) FindByPhone(ctx *gin.Context, phone string) (User, error) {
 	return user, err
 }
 
-func NewUserDAO(db *gorm.DB) *UserDAO {
-	return &UserDAO{
+func NewGormUserDAO(db *gorm.DB) UserDao {
+	return &GormUserDAO{
 		db: db,
 	}
 }

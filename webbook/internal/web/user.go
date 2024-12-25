@@ -22,14 +22,14 @@ const (
 )
 
 type UserHandler struct {
-	svc            *service.UserService
+	svc            service.UserService
 	emailRexExp    *regexp.Regexp
 	passwordRexExp *regexp.Regexp
 	phoneRexExp    *regexp.Regexp
-	smsCodeSvc     *service.CodeService
+	smsCodeSvc     service.CodeService
 }
 
-func NewUserHandler(svc *service.UserService, smsSvc *service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, smsSvc service.CodeService) *UserHandler {
 	return &UserHandler{
 		emailRexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
@@ -266,6 +266,18 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 }
 
 func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
+
+	type Profile struct {
+		Id        int64     `json:"id"`
+		Email     string    `json:"email"`
+		NickName  string    `json:"nickName"`
+		Birthday  string    `json:"birthday"`
+		AboutMe   string    `json:"aboutMe"`
+		Phone     string    `json:"phone"`
+		CreatedAt time.Time `json:"createdAt"`
+		UpdatedAt time.Time `json:"updatedAt"`
+	}
+
 	value, exists := ctx.Get("claims")
 	if !exists {
 		// 监控住这个错误
@@ -284,15 +296,25 @@ func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
+	userProfile := Profile{
+		Id:        user.Id,
+		Email:     user.Email,
+		NickName:  user.NickName,
+		Birthday:  user.Birthday,
+		AboutMe:   user.AboutMe,
+		Phone:     user.Phone,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}
 
 	// 把user转成json
-	userJson, err := json.Marshal(user)
+	userProfileJson, err := json.Marshal(userProfile)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, string(userJson))
+	ctx.JSON(http.StatusOK, string(userProfileJson))
 
 }
 

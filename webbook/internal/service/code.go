@@ -14,16 +14,22 @@ var (
 	ErrCodeVerifyTooManyTimes = repository.ErrCodeVerifyTooManyTimes
 )
 
-type CodeService struct {
-	repo   *repository.CodeRepository
+type CodeService interface {
+	Send(ctx context.Context, biz string, phone string) error
+	Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error)
+	generateCode() string
+}
+
+type CodeServiceWith6Num struct {
+	repo   repository.CodeRepository
 	smsSvc sms.Service
 	// 模板ID
 	tplId string
 }
 
-// NewCodeService 构造函数
-func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service, tplId string) *CodeService {
-	return &CodeService{
+// NewCodeServiceWith6Num 构造函数
+func NewCodeServiceWith6Num(repo repository.CodeRepository, smsSvc sms.Service, tplId string) CodeService {
+	return &CodeServiceWith6Num{
 		repo:   repo,
 		smsSvc: smsSvc,
 		tplId:  tplId,
@@ -31,8 +37,8 @@ func NewCodeService(repo *repository.CodeRepository, smsSvc sms.Service, tplId s
 }
 
 // Send 发送验证码
-func (svc *CodeService) Send(ctx context.Context,
-// 区别使用业务场景
+func (svc *CodeServiceWith6Num) Send(ctx context.Context,
+	// 区别使用业务场景
 	biz string,
 	phone string) error {
 	// 生成验证码 塞进redis
@@ -52,14 +58,14 @@ func (svc *CodeService) Send(ctx context.Context,
 	return err
 }
 
-func (svc *CodeService) generateCode() string {
+func (svc *CodeServiceWith6Num) generateCode() string {
 	// 0-999999
 	num := rand.Intn(1000000)
 	return fmt.Sprintf("%06d", num)
 }
 
 // Verify 验证验证码
-func (svc *CodeService) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
+func (svc *CodeServiceWith6Num) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
 
 	return svc.repo.Verify(ctx, biz, phone, inputCode)
 }

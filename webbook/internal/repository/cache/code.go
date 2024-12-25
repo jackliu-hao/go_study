@@ -24,11 +24,16 @@ var luaSetCode string
 //go:embed lua/verify_code.lua
 var luaVerifyCode string
 
-type CodeCache struct {
+type CodeCache interface {
+	Set(ctx context.Context, biz string, phone string, code string) error
+	Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error)
+}
+
+type RedisCodeCache struct {
 	client redis.Cmdable
 }
 
-func (c *CodeCache) Set(ctx context.Context, biz string,
+func (c *RedisCodeCache) Set(ctx context.Context, biz string,
 	phone string, code string) error {
 	// 使用Lua脚本通过Eval方法执行设置操作，该操作在Redis中实现。
 	// 该方法主要用于设置验证码，其中包含的参数如下：
@@ -58,7 +63,7 @@ func (c *CodeCache) Set(ctx context.Context, biz string,
 
 }
 
-func (c *CodeCache) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
+func (c *RedisCodeCache) Verify(ctx context.Context, biz string, phone string, inputCode string) (bool, error) {
 	res, err := c.client.Eval(ctx, luaVerifyCode, []string{c.key(biz, phone)}, inputCode).Int()
 	if err != nil {
 		// redis 坏了
@@ -80,13 +85,13 @@ func (c *CodeCache) Verify(ctx context.Context, biz string, phone string, inputC
 	}
 }
 
-func NewCodeCache(client redis.Cmdable) *CodeCache {
-	return &CodeCache{
+func NewRedisCodeCache(client redis.Cmdable) CodeCache {
+	return &RedisCodeCache{
 		client: client,
 	}
 }
 
-func (c *CodeCache) key(biz, phone string) string {
+func (c *RedisCodeCache) key(biz, phone string) string {
 	return fmt.Sprintf("phone_code:%s:%s", biz, phone)
 
 }

@@ -15,13 +15,21 @@ var (
 	ErrUserNotFound  = dao.ErrUserNotFound
 )
 
-type UserRepository struct {
-	dao   *dao.UserDAO
+type UserRepository interface {
+	Create(ctx context.Context, user domain.User) error
+	FindById(ctx context.Context, id int64) (domain.User, error)
+	FindByEmail(ctx *gin.Context, email string) (domain.User, error)
+	FindByPhone(ctx *gin.Context, phone string) (domain.User, error)
+	UpdateById(ctx *gin.Context, user domain.User) error
+}
+
+type UserRepositoryWithCache struct {
+	dao   dao.UserDao
 	cache cache.UserCache
 }
 
 // Create 创建
-func (r *UserRepository) Create(ctx context.Context, user domain.User) error {
+func (r *UserRepositoryWithCache) Create(ctx context.Context, user domain.User) error {
 
 	// 1. 密码加密
 
@@ -32,15 +40,15 @@ func (r *UserRepository) Create(ctx context.Context, user domain.User) error {
 
 }
 
-func NewUserRepository(dao *dao.UserDAO, userCache cache.UserCache) UserRepository {
+func NewUserRepositoryWithCache(dao dao.UserDao, userCache cache.UserCache) UserRepository {
 
-	return UserRepository{
+	return &UserRepositoryWithCache{
 		dao:   dao,
 		cache: userCache,
 	}
 }
 
-func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
+func (r *UserRepositoryWithCache) FindById(ctx context.Context, id int64) (domain.User, error) {
 
 	// 先从cache中查找
 	u, err := r.cache.Get(ctx, id)
@@ -71,7 +79,7 @@ func (r *UserRepository) FindById(ctx context.Context, id int64) (domain.User, e
 
 }
 
-func (r *UserRepository) FindByEmail(ctx *gin.Context, email string) (domain.User, error) {
+func (r *UserRepositoryWithCache) FindByEmail(ctx *gin.Context, email string) (domain.User, error) {
 	u, err := r.dao.FindByEmail(ctx, email)
 	// 需要将PO转成BO ,返回给service层
 	if err != nil {
@@ -80,7 +88,7 @@ func (r *UserRepository) FindByEmail(ctx *gin.Context, email string) (domain.Use
 	return r.entity2Domain(u), nil
 }
 
-func (r *UserRepository) UpdateById(ctx *gin.Context, user domain.User) error {
+func (r *UserRepositoryWithCache) UpdateById(ctx *gin.Context, user domain.User) error {
 	err := r.dao.UpdateById(ctx, dao.User{
 		Id:       user.Id,
 		NickName: user.NickName,
@@ -90,7 +98,7 @@ func (r *UserRepository) UpdateById(ctx *gin.Context, user domain.User) error {
 	return err
 }
 
-func (r *UserRepository) FindByPhone(ctx *gin.Context, phone string) (domain.User, error) {
+func (r *UserRepositoryWithCache) FindByPhone(ctx *gin.Context, phone string) (domain.User, error) {
 	u, err := r.dao.FindByPhone(ctx, phone)
 	// 需要将PO转成BO ,返回给service层
 	if err != nil {
@@ -99,7 +107,7 @@ func (r *UserRepository) FindByPhone(ctx *gin.Context, phone string) (domain.Use
 	return r.entity2Domain(u), nil
 }
 
-func (r *UserRepository) entity2Domain(ud dao.User) domain.User {
+func (r *UserRepositoryWithCache) entity2Domain(ud dao.User) domain.User {
 
 	return domain.User{
 		Id:        ud.Id,
@@ -114,7 +122,7 @@ func (r *UserRepository) entity2Domain(ud dao.User) domain.User {
 	}
 }
 
-func (r *UserRepository) domain2Entity(u domain.User) dao.User {
+func (r *UserRepositoryWithCache) domain2Entity(u domain.User) dao.User {
 	return dao.User{
 		Id: u.Id,
 		Email: sql.NullString{
