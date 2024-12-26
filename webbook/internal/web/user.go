@@ -72,6 +72,8 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 
 	var req SignUpReq
 	if err := ctx.Bind(&req); err != nil {
+		// 这里其实不需要写，Bind中会自动返回错误
+		//ctx.String(http.StatusBadRequest, "参数错误")
 		return
 	}
 	isEmail, err := h.emailRexExp.MatchString(req.Email)

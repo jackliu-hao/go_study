@@ -1,5 +1,5 @@
 # 定义一个伪目标，确保在调用make docker的时候不会执行相关文件
-.PHONY: docker
+.PHONY: docker build
 # 名为docker的目标
 
 build:
