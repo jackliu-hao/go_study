@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"github.com/gin-gonic/gin"
 	"jikeshijian_go/webbook/internal/domain"
 	"jikeshijian_go/webbook/internal/repository/cache"
 	"jikeshijian_go/webbook/internal/repository/dao"
@@ -18,9 +17,9 @@ var (
 type UserRepository interface {
 	Create(ctx context.Context, user domain.User) error
 	FindById(ctx context.Context, id int64) (domain.User, error)
-	FindByEmail(ctx *gin.Context, email string) (domain.User, error)
-	FindByPhone(ctx *gin.Context, phone string) (domain.User, error)
-	UpdateById(ctx *gin.Context, user domain.User) error
+	FindByEmail(ctx context.Context, email string) (domain.User, error)
+	FindByPhone(ctx context.Context, phone string) (domain.User, error)
+	UpdateById(ctx context.Context, user domain.User) error
 }
 
 type UserRepositoryWithCache struct {
@@ -79,7 +78,7 @@ func (r *UserRepositoryWithCache) FindById(ctx context.Context, id int64) (domai
 
 }
 
-func (r *UserRepositoryWithCache) FindByEmail(ctx *gin.Context, email string) (domain.User, error) {
+func (r *UserRepositoryWithCache) FindByEmail(ctx context.Context, email string) (domain.User, error) {
 	u, err := r.dao.FindByEmail(ctx, email)
 	// 需要将PO转成BO ,返回给service层
 	if err != nil {
@@ -88,7 +87,7 @@ func (r *UserRepositoryWithCache) FindByEmail(ctx *gin.Context, email string) (d
 	return r.entity2Domain(u), nil
 }
 
-func (r *UserRepositoryWithCache) UpdateById(ctx *gin.Context, user domain.User) error {
+func (r *UserRepositoryWithCache) UpdateById(ctx context.Context, user domain.User) error {
 	err := r.dao.UpdateById(ctx, dao.User{
 		Id:       user.Id,
 		NickName: user.NickName,
@@ -98,7 +97,7 @@ func (r *UserRepositoryWithCache) UpdateById(ctx *gin.Context, user domain.User)
 	return err
 }
 
-func (r *UserRepositoryWithCache) FindByPhone(ctx *gin.Context, phone string) (domain.User, error) {
+func (r *UserRepositoryWithCache) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
 	u, err := r.dao.FindByPhone(ctx, phone)
 	// 需要将PO转成BO ,返回给service层
 	if err != nil {

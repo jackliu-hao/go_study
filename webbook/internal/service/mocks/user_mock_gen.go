@@ -43,7 +43,7 @@ func (m *MockUserService) EXPECT() *MockUserServiceMockRecorder {
 }
 
 // Edit mocks base method.
-func (m *MockUserService) Edit(ctx *gin.Context, user domain.User) error {
+func (m *MockUserService) Edit(ctx context.Context, user domain.User) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Edit", ctx, user)
 	ret0, _ := ret[0].(error)
@@ -57,7 +57,7 @@ func (mr *MockUserServiceMockRecorder) Edit(ctx, user any) *gomock.Call {
 }
 
 // FindOrCreate mocks base method.
-func (m *MockUserService) FindOrCreate(c *gin.Context, phone string) (domain.User, error) {
+func (m *MockUserService) FindOrCreate(c context.Context, phone string) (domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "FindOrCreate", c, phone)
 	ret0, _ := ret[0].(domain.User)
@@ -72,7 +72,7 @@ func (mr *MockUserServiceMockRecorder) FindOrCreate(c, phone any) *gomock.Call {
 }
 
 // Login mocks base method.
-func (m *MockUserService) Login(ctx *gin.Context, u domain.User) (domain.User, error) {
+func (m *MockUserService) Login(ctx context.Context, u domain.User) (domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Login", ctx, u)
 	ret0, _ := ret[0].(domain.User)
@@ -87,7 +87,7 @@ func (mr *MockUserServiceMockRecorder) Login(ctx, u any) *gomock.Call {
 }
 
 // Profile mocks base method.
-func (m *MockUserService) Profile(ctx *gin.Context, id int64) (domain.User, error) {
+func (m *MockUserService) Profile(ctx context.Context, id int64) (domain.User, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Profile", ctx, id)
 	ret0, _ := ret[0].(domain.User)

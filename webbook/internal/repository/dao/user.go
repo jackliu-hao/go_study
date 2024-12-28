@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"time"
@@ -20,7 +19,7 @@ type UserDao interface {
 	FindByEmail(ctx context.Context, email string) (User, error)
 	UpdateById(ctx context.Context, user User) error
 	FindById(ctx context.Context, id int64) (User, error)
-	FindByPhone(ctx *gin.Context, phone string) (User, error)
+	FindByPhone(ctx context.Context, phone string) (User, error)
 }
 
 type GormUserDAO struct {
@@ -71,7 +70,7 @@ func (dao *GormUserDAO) FindById(ctx context.Context, id int64) (User, error) {
 	return user, err
 }
 
-func (dao *GormUserDAO) FindByPhone(ctx *gin.Context, phone string) (User, error) {
+func (dao *GormUserDAO) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var user User
 	// select * from `user` where id = ? limit 1
 

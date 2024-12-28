@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"jikeshijian_go/webbook/internal/domain"
 	"jikeshijian_go/webbook/internal/repository"
@@ -17,10 +16,10 @@ var (
 
 type UserService interface {
 	SingUp(ctx context.Context, user domain.User) error
-	Login(ctx *gin.Context, u domain.User) (domain.User, error)
-	Edit(ctx *gin.Context, user domain.User) error
-	Profile(ctx *gin.Context, id int64) (domain.User, error)
-	FindOrCreate(c *gin.Context, phone string) (domain.User, error)
+	Login(ctx context.Context, u domain.User) (domain.User, error)
+	Edit(ctx context.Context, user domain.User) error
+	Profile(ctx context.Context, id int64) (domain.User, error)
+	FindOrCreate(c context.Context, phone string) (domain.User, error)
 }
 
 type UserServiceV1 struct {
@@ -44,12 +43,12 @@ func (svc *UserServiceV1) SingUp(ctx context.Context, user domain.User) error {
 	return svc.userRepository.Create(ctx, user)
 }
 
-func (svc *UserServiceV1) Login(ctx *gin.Context, u domain.User) (domain.User, error) {
+func (svc *UserServiceV1) Login(ctx context.Context, u domain.User) (domain.User, error) {
 	// 查询用户
 	user, err := svc.userRepository.FindByEmail(ctx, u.Email)
 	if err != nil {
-		if err == repository.ErrUserNotFound {
-			return domain.User{}, ErrInvalidUserOrPassword
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return domain.User{}, ErrUserNotFind
 		}
 		return domain.User{}, err
 	}
@@ -62,12 +61,12 @@ func (svc *UserServiceV1) Login(ctx *gin.Context, u domain.User) (domain.User, e
 	return user, nil
 }
 
-func (svc *UserServiceV1) Edit(ctx *gin.Context, user domain.User) error {
+func (svc *UserServiceV1) Edit(ctx context.Context, user domain.User) error {
 	err := svc.userRepository.UpdateById(ctx, user)
 	return err
 }
 
-func (svc *UserServiceV1) Profile(ctx *gin.Context, id int64) (domain.User, error) {
+func (svc *UserServiceV1) Profile(ctx context.Context, id int64) (domain.User, error) {
 	user, err := svc.userRepository.FindById(ctx, id)
 	if err != nil {
 		return domain.User{}, err
@@ -75,7 +74,7 @@ func (svc *UserServiceV1) Profile(ctx *gin.Context, id int64) (domain.User, erro
 	return user, nil
 }
 
-func (svc *UserServiceV1) FindOrCreate(c *gin.Context, phone string) (domain.User, error) {
+func (svc *UserServiceV1) FindOrCreate(c context.Context, phone string) (domain.User, error) {
 
 	// 快路径
 	user, err := svc.userRepository.FindByPhone(c, phone)
