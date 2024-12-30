@@ -53,6 +53,8 @@ func InitGinMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 			println("这是我的 Middleware")
 		},
 		ratelimit.NewBuilder(redisClient, time.Second, 1000).Build(),
-		(&middleware.LoginJwtMiddlewareBuilder{}).Build(),
+		(&middleware.LoginJwtMiddlewareBuilder{}).
+			IgnorePath("/users/login_sms/code/send").
+			Build(),
 	}
 }

@@ -334,24 +334,39 @@ func (h *UserHandler) SendSms(context *gin.Context) {
 	// 校验手机号
 	isPhone, err := h.phoneRexExp.MatchString(req.Phone)
 	if err != nil {
-		context.String(http.StatusOK, "系统错误")
+		context.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
 		return
 	}
 	if !isPhone {
-		context.String(http.StatusOK, "非法手机号")
+		context.JSON(http.StatusOK, Result{
+			Code: 3,
+			Msg:  "非法手机号",
+		})
 		return
 	}
 
 	err = h.smsCodeSvc.Send(context, "login", req.Phone)
 	if err != nil {
 		if errors.Is(err, service.ErrSetCodeTooManyTimes) {
-			context.String(http.StatusOK, "发送次数过多")
+			context.JSON(http.StatusOK, Result{
+				Code: 4,
+				Msg:  "验证码发送太频繁",
+			})
 		} else {
-			context.String(http.StatusInternalServerError, "系统错误")
+			context.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "系统错误",
+			})
 		}
 		return
 	}
-	context.String(http.StatusOK, "发送成功")
+	context.JSON(http.StatusOK, Result{
+		Code: 0,
+		Msg:  "发送成功",
+	})
 }
 
 func (h *UserHandler) verifySmsCode(context *gin.Context) {
@@ -362,27 +377,45 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 	var req Req
 	err := context.Bind(&req)
 	if err != nil {
-		context.String(http.StatusBadRequest, "参数错误")
+		context.JSON(http.StatusBadRequest, Result{
+			Code: 4,
+			Msg:  "请输入手机号码",
+		})
 		return
 	}
 	matchString, err := h.phoneRexExp.MatchString(req.Phone)
 	if err != nil {
-		context.String(http.StatusInternalServerError, "系统错误")
+		context.JSON(http.StatusBadRequest, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
 		return
 	}
 	if !matchString {
-		context.String(http.StatusOK, "非法手机号")
+		context.JSON(http.StatusBadRequest, Result{
+			Code: 5,
+			Msg:  "手机号格式不对",
+		})
 		return
 	}
 	// 校验验证码是六位手机号
 	verify, err := h.smsCodeSvc.Verify(context, "login", req.Phone, req.Code)
 	if err != nil {
 		if errors.Is(err, service.ErrCodeVerifyFailed) {
-			context.String(http.StatusOK, "验证码错误")
+			context.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "验证码输入错误",
+			})
 		} else if errors.Is(err, service.ErrCodeVerifyTooManyTimes) {
-			context.String(http.StatusOK, "验证次数过多")
+			context.JSON(http.StatusOK, Result{
+				Code: 4,
+				Msg:  "验证次数太多",
+			})
 		} else {
-			context.String(http.StatusInternalServerError, "系统错误")
+			context.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "系统错误",
+			})
 		}
 		return
 	}
@@ -391,15 +424,24 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 		// 存放ID
 		domainUser, err := h.svc.FindOrCreate(context, req.Phone)
 		if err != nil {
-			context.String(http.StatusInternalServerError, "系统错误")
+			context.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "系统错误",
+			})
 			return
 		}
 		err = h.setJwt(context, domainUser.Id)
 		if err != nil {
-			context.String(http.StatusInternalServerError, "系统错误")
+			context.JSON(http.StatusOK, Result{
+				Code: 5,
+				Msg:  "系统错误",
+			})
 			return
 		}
-		context.String(http.StatusOK, "验证成功")
+		context.JSON(http.StatusOK, Result{
+			Code: 0,
+			Msg:  "发送成功",
+		})
 	}
 	return
 

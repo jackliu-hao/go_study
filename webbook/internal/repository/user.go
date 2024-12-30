@@ -6,6 +6,7 @@ import (
 	"jikeshijian_go/webbook/internal/domain"
 	"jikeshijian_go/webbook/internal/repository/cache"
 	"jikeshijian_go/webbook/internal/repository/dao"
+	"log"
 	"time"
 )
 
@@ -63,14 +64,20 @@ func (r *UserRepositoryWithCache) FindById(ctx context.Context, id int64) (domai
 			return domain.User{}, ErrUserNotFound
 		}
 		user := r.entity2Domain(ud)
-		go func() {
-			// 找到了在写到cache
-			err = r.cache.Set(ctx, user)
-			if err != nil {
-				// how to do ?
-				// 应该打日志，做监控
-			}
-		}()
+		//go func() {
+		//	// 找到了在写到cache
+		//	err = r.cache.Set(ctx, user)
+		//	if err != nil {
+		//		// how to do ?
+		//		// 应该打日志，做监控
+		//	}
+		//}()
+		err = r.cache.Set(ctx, user)
+		if err != nil {
+			// how to do ?
+			// 应该打日志，做监控
+			log.Println("缓存设置失败")
+		}
 		return user, err
 	}
 	// 这里怎么搞？缓存出错了
