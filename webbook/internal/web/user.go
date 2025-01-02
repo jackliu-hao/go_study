@@ -329,7 +329,10 @@ func (h *UserHandler) SendSms(context *gin.Context) {
 	var req Req
 	err := context.Bind(&req)
 	if err != nil {
-		return
+		context.JSON(http.StatusOK, Result{
+			Code: 3,
+			Msg:  "非法手机号",
+		})
 	}
 	// 校验手机号
 	isPhone, err := h.phoneRexExp.MatchString(req.Phone)

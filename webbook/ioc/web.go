@@ -7,6 +7,7 @@ import (
 	"jikeshijian_go/webbook/internal/web"
 	"jikeshijian_go/webbook/internal/web/middleware"
 	"jikeshijian_go/webbook/pkg/ginx/middlewares/ratelimit"
+	ratelimit2 "jikeshijian_go/webbook/pkg/ratelimit"
 	"strings"
 	"time"
 )
@@ -52,7 +53,7 @@ func InitGinMiddlewares(redisClient redis.Cmdable) []gin.HandlerFunc {
 		func(ctx *gin.Context) {
 			println("这是我的 Middleware")
 		},
-		ratelimit.NewBuilder(redisClient, time.Second, 1000).Build(),
+		ratelimit.NewBuilder(ratelimit2.NewRedisSlidingWindowLimiter(redisClient, 10*time.Second, 100)).Build(),
 		(&middleware.LoginJwtMiddlewareBuilder{}).
 			IgnorePath("/users/login_sms/code/send").
 			Build(),

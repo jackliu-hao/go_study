@@ -20,3 +20,6 @@ mockRedis:
 # 生成redis的mock , 因为是使用三方的包，这里不存在--source， 第三个参数是对应的包路径和类名，可以使用 , 生成多个类型
 	@mockgen -package=redismocks -destination=webbook/mocks/redis_mock_gen.go  github.com/redis/go-redis/v9 Cmdable
 	@go mod tidy
+
+mockRateLimit:
+	@mockgen -source=webbook/pkg/ratelimit/type.go -package=limitmocks -destination=webook/pkg/ratelimit/mocks/limiter.mock.go
