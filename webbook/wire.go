@@ -10,6 +10,7 @@ import (
 	"jikeshijian_go/webbook/internal/repository/dao"
 	"jikeshijian_go/webbook/internal/service"
 	"jikeshijian_go/webbook/internal/web"
+	ijwt "jikeshijian_go/webbook/internal/web/jwt"
 	"jikeshijian_go/webbook/ioc"
 	"time"
 )
@@ -18,6 +19,13 @@ func InitWebServerIOC() *gin.Engine {
 	wire.Build(
 		// 第三方依赖
 		ioc.InitRedis, ioc.InitDB,
+
+		//logger
+		ioc.InitLogger,
+
+		// jwt
+		ijwt.NewRedisJWTHandler,
+
 		// DAO 部分
 		dao.NewGormUserDAO,
 
@@ -35,8 +43,15 @@ func InitWebServerIOC() *gin.Engine {
 		InitCodeServiceTpl,
 		service.NewCodeServiceWith6Num,
 
+		//wechat部分
+		ioc.InitOAuth2WechatService,
+
 		// handler 部分
 		web.NewUserHandler,
+		// wechat
+		web.NewOAuth2WechatHandler,
+		//config
+		ioc.NewWechatHandler,
 
 		ioc.InitGinMiddlewares,
 		ioc.InitWebServer,

@@ -23,3 +23,20 @@ mockRedis:
 
 mockRateLimit:
 	@mockgen -source=webbook/pkg/ratelimit/type.go -package=limitmocks -destination=webook/pkg/ratelimit/mocks/limiter.mock.go
+
+mockAll:
+	#调用所有的mock命令
+	@$(MAKE) mockSvc
+	@$(MAKE) mockRepo
+	@$(MAKE) mockDao
+	@$(MAKE) mockRedis
+	@$(MAKE) mockRateLimit
+	@go mod tidy
+	@echo "mock all done"
+
+clean:
+	@rm -rf webbook/internal/service/mocks/user_mock_gen.go
+	@rm -rf webbook/internal/service/mocks/code_mock_gen.go
+	@rm -rf webbook/internal/repository/mocks/user_mock_gen.go
+	@rm -rf webbook/internal/repository/mocks/code_mock_gen.go
+	@rm -rf webbook/internal/repository/dao/mocks/user_mock_gen.go

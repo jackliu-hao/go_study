@@ -2,6 +2,7 @@ package retryable
 
 import (
 	"context"
+	"errors"
 	"jikeshijian_go/webbook/internal/service/sms"
 )
 
@@ -12,11 +13,17 @@ type Service struct {
 }
 
 func (s Service) Send(ctx context.Context, tpl string, args []string, phoneNumbers ...string) error {
-	//TODO implement me
 	err := s.svc.Send(ctx, tpl, args, phoneNumbers...)
-	for err != nil && s.retryCount < 10 {
-		err = s.svc.Send(ctx, tpl, args, phoneNumbers...)
-		s.retryCount++
+	cnt := 1
+	if err != nil {
+		return err
 	}
-	return err
+	for err != nil && cnt <= s.retryCount {
+		err = s.svc.Send(ctx, tpl, args, phoneNumbers...)
+		if err == nil {
+			return nil
+		}
+		cnt++
+	}
+	return errors.New("短信服务功能重试都失败了")
 }

@@ -13,6 +13,7 @@ import (
 	"jikeshijian_go/webbook/internal/repository/dao"
 	"jikeshijian_go/webbook/internal/service"
 	"jikeshijian_go/webbook/internal/web"
+	"jikeshijian_go/webbook/internal/web/jwt"
 	"jikeshijian_go/webbook/ioc"
 	"time"
 )
@@ -21,8 +22,10 @@ import (
 
 func InitWebServerIOC() *gin.Engine {
 	cmdable := ioc.InitRedis()
-	v := ioc.InitGinMiddlewares(cmdable)
-	db := ioc.InitDB()
+	handler := jwt.NewRedisJWTHandler(cmdable)
+	loggerV1 := ioc.InitLogger()
+	v := ioc.InitGinMiddlewares(cmdable, handler, loggerV1)
+	db := ioc.InitDB(loggerV1)
 	userDao := dao.NewGormUserDAO(db)
 	duration := InitCacheTime()
 	userCache := cache.NewRedisUserCache(cmdable, duration)
@@ -33,8 +36,11 @@ func InitWebServerIOC() *gin.Engine {
 	smsService := ioc.InitSMSService()
 	string2 := InitCodeServiceTpl()
 	codeService := service.NewCodeServiceWith6Num(codeRepository, smsService, string2)
-	userHandler := web.NewUserHandler(userService, codeService)
-	engine := ioc.InitWebServer(v, userHandler)
+	userHandler := web.NewUserHandler(userService, codeService, handler)
+	wechatService := ioc.InitOAuth2WechatService()
+	wechatHandlerConfig := ioc.NewWechatHandler()
+	oAuth2WechatHandler := web.NewOAuth2WechatHandler(wechatService, userService, wechatHandlerConfig, handler)
+	engine := ioc.InitWebServer(v, userHandler, oAuth2WechatHandler)
 	return engine
 }
 

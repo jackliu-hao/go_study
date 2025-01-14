@@ -21,11 +21,17 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (domain.User, error)
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 	UpdateById(ctx context.Context, user domain.User) error
+	FindByWechat(ctx context.Context, openId string) (domain.User, error)
 }
 
 type UserRepositoryWithCache struct {
 	dao   dao.UserDao
 	cache cache.UserCache
+}
+
+func (r *UserRepositoryWithCache) FindByWechat(ctx context.Context, openId string) (domain.User, error) {
+	u, err := r.dao.FindByWechat(ctx, openId)
+	return r.entity2Domain(u), err
 }
 
 // Create 创建
@@ -122,9 +128,13 @@ func (r *UserRepositoryWithCache) entity2Domain(ud dao.User) domain.User {
 		CreatedAt: time.UnixMilli(ud.CreatedAt),
 		UpdatedAt: time.UnixMilli(ud.UpdatedAt),
 		AboutMe:   ud.AboutMe,
-		Birthday:  ud.Birthday,
-		NickName:  ud.NickName,
-		Phone:     ud.Phone.String,
+		WechatInfo: domain.WechatInfo{
+			OpenId:  ud.WechatOpenId.String,
+			UnionId: ud.WechatUnionId.String,
+		},
+		Birthday: ud.Birthday,
+		NickName: ud.NickName,
+		Phone:    ud.Phone.String,
 	}
 }
 
@@ -140,7 +150,15 @@ func (r *UserRepositoryWithCache) domain2Entity(u domain.User) dao.User {
 		UpdatedAt: u.UpdatedAt.UnixMilli(),
 		AboutMe:   u.AboutMe,
 		Birthday:  u.Birthday,
-		NickName:  u.NickName,
+		WechatOpenId: sql.NullString{
+			String: u.WechatInfo.OpenId,
+			Valid:  u.WechatInfo.OpenId != "",
+		},
+		WechatUnionId: sql.NullString{
+			String: u.WechatInfo.UnionId,
+			Valid:  u.WechatInfo.UnionId != "",
+		},
+		NickName: u.NickName,
 		Phone: sql.NullString{
 			String: u.Phone,
 			Valid:  u.Phone != "",

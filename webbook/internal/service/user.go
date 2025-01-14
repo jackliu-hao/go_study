@@ -20,10 +20,35 @@ type UserService interface {
 	Edit(ctx context.Context, user domain.User) error
 	Profile(ctx context.Context, id int64) (domain.User, error)
 	FindOrCreate(c context.Context, phone string) (domain.User, error)
+	FindOrCreateByWechat(c context.Context, info domain.WechatInfo) (domain.User, error)
 }
 
 type UserServiceV1 struct {
 	userRepository repository.UserRepository
+}
+
+func (svc *UserServiceV1) FindOrCreateByWechat(c context.Context, info domain.WechatInfo) (domain.User, error) {
+	// 快路径
+	user, err := svc.userRepository.FindByWechat(c, info.OpenId)
+	// 需要判断这个用户是否存在，如果不存在需要创建
+	if !errors.Is(err, ErrUserNotFind) {
+		// 其他非预期错误
+		return user, err
+	} else {
+		// 确实是没找到有这个用户，需要创建一个用户
+		user = domain.User{
+			WechatInfo: info,
+		}
+		// 慢路径
+		err := svc.userRepository.Create(c, user)
+		if err != nil && !errors.Is(err, ErrUserDuplicate) {
+			return domain.User{}, err
+		}
+		// 再次找一下，并且返回
+		// 可能存在主从延迟的问题
+		return svc.userRepository.FindByWechat(c, info.OpenId)
+	}
+
 }
 
 func NewUserServiceV1(userRepository repository.UserRepository) UserService {
@@ -78,7 +103,10 @@ func (svc *UserServiceV1) FindOrCreate(c context.Context, phone string) (domain.
 
 	// 快路径
 	user, err := svc.userRepository.FindByPhone(c, phone)
-	if errors.Is(err, ErrUserNotFind) {
+	if !errors.Is(err, ErrUserNotFind) {
+		// 其他错误
+		return user, err
+	} else {
 		// 需要判断这个用户是否存在，如果不存在需要创建
 		user = domain.User{
 			Phone: phone,
@@ -91,8 +119,5 @@ func (svc *UserServiceV1) FindOrCreate(c context.Context, phone string) (domain.
 		// 再次找一下，并且返回
 		// 可能存在主从延迟的问题
 		return svc.userRepository.FindByPhone(c, phone)
-	} else {
-		// 其他错误
-		return domain.User{}, err
 	}
 }

@@ -7,8 +7,10 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 	"jikeshijian_go/webbook/internal/domain"
 	"jikeshijian_go/webbook/internal/service"
+	ijwt "jikeshijian_go/webbook/internal/web/jwt"
 	"net/http"
 	"time"
 )
@@ -27,15 +29,17 @@ type UserHandler struct {
 	passwordRexExp *regexp.Regexp
 	phoneRexExp    *regexp.Regexp
 	smsCodeSvc     service.CodeService
+	ijwt.Handler
 }
 
-func NewUserHandler(svc service.UserService, smsSvc service.CodeService) *UserHandler {
+func NewUserHandler(svc service.UserService, smsSvc service.CodeService, handler ijwt.Handler) *UserHandler {
 	return &UserHandler{
 		emailRexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
 		phoneRexExp:    regexp.MustCompile(phoneRegexPattern, regexp.None),
 		svc:            svc,
 		smsCodeSvc:     smsSvc,
+		Handler:        handler,
 	}
 }
 
@@ -61,6 +65,10 @@ func (h *UserHandler) RegisterRoutes(server *gin.Engine) {
 	ug.POST("/login_sms/code/send", h.SendSms)
 	// 校验验证码
 	ug.POST("/login_sms/code/check", h.verifySmsCode)
+	// refreshToken
+	ug.POST("/refresh_token", h.RefreshToken)
+	// 退出登录
+	ug.POST("/logout", h.LogoutJWT)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -143,36 +151,15 @@ func (h *UserHandler) LoginJWT(ctx *gin.Context) {
 	// 使用jwt设置登录状态
 	// 使用jwt生成一个token
 
-	err = h.setJwt(ctx, user.Id)
+	err = h.SetLoginToken(ctx, user.Id)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-
 	// 登录成功
 	ctx.String(http.StatusOK, "登录成功")
 	return
 
-}
-
-func (h *UserHandler) setJwt(ctx *gin.Context, uid int64) error {
-	claims := UserClaims{
-		// 设置过期时间
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Minute)),
-		},
-		// 设置用户id
-		Uid: uid,
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedString, err := token.SignedString([]byte("0776f450dd575004ba7c69930c579cae"))
-	if err != nil {
-		ctx.String(http.StatusInternalServerError, "系统错误")
-		return err
-	}
-	// 把jwt放到header中
-	ctx.Header("x-jwt-token", signedString)
-	return nil
 }
 
 func (h *UserHandler) Login(ctx *gin.Context) {
@@ -287,7 +274,7 @@ func (h *UserHandler) ProfileJWT(ctx *gin.Context) {
 		return
 	}
 
-	claims, ok := value.(*UserClaims)
+	claims, ok := value.(*ijwt.UserClaims)
 	if !ok {
 		// 系统错误
 		ctx.String(http.StatusOK, "系统错误")
@@ -364,6 +351,8 @@ func (h *UserHandler) SendSms(context *gin.Context) {
 				Msg:  "系统错误",
 			})
 		}
+		// 打印日志
+		zap.L().Error("发送短信失败", zap.Error(err))
 		return
 	}
 	context.JSON(http.StatusOK, Result{
@@ -392,6 +381,10 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 			Code: 5,
 			Msg:  "系统错误",
 		})
+		//打印日志
+		zap.L().Error("验证码校验出错", zap.Error(err))
+		// 日志中不能直接打印手机号码，只能在debug中打印 ，或者打印加密后的手机号 oR 脱敏
+		zap.L().Debug("手机号：", zap.String("phone", req.Phone))
 		return
 	}
 	if !matchString {
@@ -433,7 +426,7 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 			})
 			return
 		}
-		err = h.setJwt(context, domainUser.Id)
+		err = h.SetLoginToken(context, domainUser.Id)
 		if err != nil {
 			context.JSON(http.StatusOK, Result{
 				Code: 5,
@@ -441,6 +434,7 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 			})
 			return
 		}
+
 		context.JSON(http.StatusOK, Result{
 			Code: 0,
 			Msg:  "发送成功",
@@ -450,9 +444,45 @@ func (h *UserHandler) verifySmsCode(context *gin.Context) {
 
 }
 
-// UserClaims 存放jwt的内容
-type UserClaims struct {
-	jwt.RegisteredClaims
-	// 声名自己要放到Claim的数据
-	Uid int64
+func (h *UserHandler) RefreshToken(context *gin.Context) {
+	// 约定，前端在 Authorization 里面带上这个 refresh_token
+	tokenStr := h.ExtractToken(context)
+	var rc ijwt.RefreshClaims
+	token, err := jwt.ParseWithClaims(tokenStr, &rc, func(token *jwt.Token) (interface{}, error) {
+		return ijwt.RCJWTKey, nil
+	})
+	if err != nil || !token.Valid {
+		context.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	// 这里如果redis崩了，可以直接跳过去
+
+	// 需要校验此次请求的token是否有效
+	err = h.CheckSession(context, rc.Ssid)
+	if err != nil {
+		// token 无效或者 redis 有问题
+		context.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+
+	err = h.SetJWTToken(context, rc.Uid, rc.Ssid)
+	if err != nil {
+		zap.L().Error("设置Jwt异常", zap.Error(err))
+		context.AbortWithStatus(http.StatusUnauthorized)
+		return
+	}
+	context.JSON(http.StatusOK, Result{
+		Msg: "OK",
+	})
+}
+
+// LogoutJWT 退出登录
+func (h *UserHandler) LogoutJWT(ctx *gin.Context) {
+	err := h.ClearToken(ctx)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{Code: 5, Msg: "系统错误"})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{Msg: "退出登录成功"})
 }

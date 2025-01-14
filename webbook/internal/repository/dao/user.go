@@ -20,10 +20,17 @@ type UserDao interface {
 	UpdateById(ctx context.Context, user User) error
 	FindById(ctx context.Context, id int64) (User, error)
 	FindByPhone(ctx context.Context, phone string) (User, error)
+	FindByWechat(ctx context.Context, openId string) (User, error)
 }
 
 type GormUserDAO struct {
 	db *gorm.DB
+}
+
+func (dao *GormUserDAO) FindByWechat(ctx context.Context, openId string) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("wechat_open_id = ?", openId).First(&u).Error
+	return u, err
 }
 
 func (dao *GormUserDAO) Insert(ctx context.Context, user User) error {
@@ -101,6 +108,10 @@ type User struct {
 	// 唯一索引，允许存在多个空值
 	// 但是不能允许多个 ""
 	Phone sql.NullString `gorm:"unique"`
+
+	//微信的绑定字段
+	WechatUnionId sql.NullString
+	WechatOpenId  sql.NullString `gorm:"unique"`
 
 	// 创建时间，毫秒数
 	CreatedAt int64

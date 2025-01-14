@@ -21,11 +21,11 @@ func NewService(client *sms.Client, appId string, signName string) *SMSService {
 	}
 }
 
-func (ss SMSService) Send(ctx context.Context, tpl string, args []string, phoneNumbers ...string) error {
+func (ss SMSService) Send(ctx context.Context, biz string, args []string, phoneNumbers ...string) error {
 	req := sms.NewSendSmsRequest()
 	req.SmsSdkAppId = ss.appId
 	req.SignName = ss.signature
-	req.TemplateId = &tpl
+	req.TemplateId = &biz
 	// 需要把可变数据转成切片
 	req.PhoneNumberSet = ss.toPtrSlice(phoneNumbers)
 	req.TemplateParamSet = ss.toPtrSlice(args)
